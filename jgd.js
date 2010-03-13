@@ -99,54 +99,74 @@
             this.addAll(arr);
     }
     
-    function NullAdapter(universal) {}
-    NullAdapter.prototype.get_id     = function(search_string, strict_match, var_args) {return null;}
-    NullAdapter.prototype.filter     = function(prop, ids, rhs, reverse) {return [new Set(), {}]}
-    NullAdapter.prototype.annotate   = function(prop, node_id, data, reverse) {return null;}
+    /** @constructor 
+      * @param {boolean=} universal
+      */
+    function Adapter(universal) {}
+    Adapter.prototype.get_id     = function(search_string, strict_match, var_args) {return null;}
+    Adapter.prototype.filter     = function(prop, ids, rhs, reverse) {return [new Set(), {}]}
+    Adapter.prototype.annotate   = function(prop, node_id, data, reverse) {return null;}
     
+    function NullAdapter(universal) {}
+    NullAdapter.prototype = new Adapter();
     
     /** @constructor */
     function TripleStore() {
         //all of the indices
-        /** @type Object.<string,number> */
         this.ids = {};
-        /** @type Object.<string,Object.<string,number>>*/
         this.ns_ids = {};
-        /** @type Object.<string,Array.<Array>>*/
         this.predicates = {};
-        /** @type Object.<string,Array.<Array>> */
         this.literal_predicates = {};
-        /** @type Object.<string,Array.<Array>> */
         this.literals = {};
-        /** @type number */
         this.id_printer = 0;
-        /** @type Object.<number, GraphNode>*/
         this.nodes = {};
-        /** @type Object.<string, Adapter> */
         this.ns = {};
-        /** @type number*/
         this.primitive_count = 0;
-        /** @type number*/
         this.__json_id = 0;
     }
     
-    /** GraphNode
-        {"ids": Array.<number>,
-         "links": Object.<string, Array.<number>>},
-         "literal_links": Object.<string, Array.<string>>,
-         "reverse_links": Object.<string, Array.<number>>},
-        }
-    */
+    /** @typedef {{ids: Array.<number>, 
+                   links: Object.<string, Array.<number>>, 
+                   literal_links: Object.<string, Array.<string>>, 
+                   reverse_links: Object.<string, Array.<number>>}} */
+    TripleStore.node;
+    
+    /** @type Object.<string,number> */
+    TripleStore.prototype.ids;
+    /** @type Object.<string,Object.<string,number>>*/
+    TripleStore.prototype.ns_ids;
+    /** @type Object.<string,Array.<Array>>*/
+    TripleStore.prototype.predicates;
+    /** @type Object.<string,Array.<Array>> */
+    TripleStore.prototype.literal_predicates;
+    /** @type Object.<string,Array.<Array>> */
+    TripleStore.prototype.literals;
+    /** @type number */
+    TripleStore.prototype.id_printer;
+    /** @type Object.<number, TripleStore.node>*/
+    TripleStore.prototype.nodes;
+    /** @type Object.<string, Adapter> */
+    TripleStore.prototype.ns;
+    /** @type number*/
+    TripleStore.prototype.primitive_count;
+    /** @type number*/
+    TripleStore.prototype.__json_id;
     
     TripleStore.prototype.add_to_index = function(index, key, value) {
         index[key] = index[key] || [];
         index[key].push(value);
     }
     
+    /** @param {string} id 
+      * @return {!boolean}
+      */
     TripleStore.prototype.is_id = function(id) {
         return pyIn(id, this.ids);
     }
     
+    /** @param {number} nodenum
+      * @return {string}
+      */
     TripleStore.prototype.get_id = function(nodenum) {
         return this.nodes[nodenum]['ids'][0]
     }
@@ -187,6 +207,9 @@
         this.primitive_count++;
     }
 //  Add a node. Returns the node id.
+    /** @param {string} id
+      * @return {string}
+      */
     TripleStore.prototype.add_node = function(id) {
         id = id + "";
         if (id.charAt(0) !== ":")
