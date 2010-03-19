@@ -127,12 +127,13 @@ class TripleStore(object):
             raise TripleException()
         s = self.ids[s]
         if o in self.ids:
+            o_nn = self.ids[o]
             if p in self.nodes[s]["links"]:
-                if o in self.nodes[s]["links"][p]:
+                if o_nn in self.nodes[s]["links"][p]:
                     return
-            self.add_to_index(self.nodes[self.ids[o]]["reverse_links"], p, s)
-            self.add_to_index(self.nodes[s]["links"], p, self.ids[o])
-            self.add_to_index(self.predicates, p, (s, self.ids[o]))
+            self.add_to_index(self.nodes[o_nn]["reverse_links"], p, s)
+            self.add_to_index(self.nodes[s]["links"], p, o_nn)
+            self.add_to_index(self.predicates, p, (s, o_nn))
         else:
             # o is literal
             if p in self.nodes[s]["literal_links"]:
@@ -157,6 +158,16 @@ class TripleStore(object):
             self.primitive_count += 1
         return id
 
+    def add_id_for_node(self, id, target_id):
+        if not id.startswith(":"):
+            id = ":%s" % id
+        if id not in self.ids:
+            self.ids[id] = self.ids[target_id]
+            self.nodes[self.ids[target_id]]["ids"].append(id)
+            return id
+        else:
+            raise IDException()
+
     # Add an adapter for a namespace
     def add_ns_adapter(self, ns, adapter_class, universal=False):
         self.ns[ns] = adapter_class(universal)
@@ -177,14 +188,95 @@ class TripleStore(object):
             count += 1
         return count
 
-    def reify(self, prop, to_prop, query):
-        pass
+    def reify(self, prop, to_prop, query={}):
+        if type(query) == type([]):
+            query = query[0]
+        out_set, out_data = self.__filter(query)
+        for nn in out_set:
+            if prop in self.nodes[nn]["literal_links"]:
+                for x in self.nodes[nn]["literal_links"][prop]:
+                    target_id = self.__generate_id()
+                    newnode = self.add_node(target_id)
+                    self.remove_link((self.nodes[nn]["ids"][0], prop, x))
+                    self.add_link((self.nodes[nn]["ids"][0], prop, newnode))
+                    self.add_link((newnode, to_prop, x))
 
-    def iterate_triples_for_id(self, id):
-        pass
+    def generate_triples_for_id(self, id):
+        #out is [forward, reverse, literal]
+        out = []
+        nn = self.ids[id]
+        thisout = []
+        for prop in self.nodes[nn]["links"]:
+            for x in self.nodes[nn]["links"][prop]:
+                thisout.append((id, prop, self.nodes[x]["ids"][0]))
+        out.append(thisout)
+        thisout = []
+        for prop in self.nodes[nn]["reverse_links"]:
+            for x in self.nodes[nn]["reverse_links"][prop]:
+                thisout.append((self.nodes[x]["ids"][0], prop, id))
+        out.append(thisout)
+        thisout = []
+        for prop in self.nodes[nn]["literal_links"]:
+            for x in self.nodes[nn]["literal_links"][prop]:
+                thisout.append((id, prop, x))
+        out.append(thisout)
+        return out
+
+    def delete_node(self, id, force=False):
+        triples = self.generate_triples_for_id(id)
+        nn = self.ids[id]
+        if not force:
+            if sum(map(len, triples)) != 0:
+                raise TripleException("Cannot delete linked node (use force)")
+        for triple in sum(triples, []):
+            self.remove_link(triple)
+        for del_id in self.nodes[nn]["ids"]:
+            t = self.ns_split_id(del_id)
+            del self.ids[del_id]
+            if t is not None:
+                ns, i = t
+                del self.ns_ids[ns][i]
+        del self.nodes[nn]
 
     def remove_link(self, triple):
         s, p, o = triple
+        if not s in self.ids:
+            raise TripleException()
+        s_nn = self.ids[s]
+        if o in self.ids:
+            o_nn = self.ids[o]
+            # target is a link
+            if p not in self.nodes[s_nn]["links"]:
+                return
+            if o_nn not in self.nodes[s_nn]["links"][p]:
+                return
+            self.nodes[s_nn]["links"][p].remove(o_nn)
+            if len(self.nodes[s_nn]["links"][p]) == 0:
+                del self.nodes[s_nn]["links"][p]
+            self.nodes[o_nn]["reverse_links"][p].remove(s_nn)
+            if len(self.nodes[o_nn]["reverse_links"][p]) == 0:
+                del self.nodes[o_nn]["reverse_links"][p]
+            self.predicates[p].remove((s_nn, o_nn))
+            if len(self.predicates[p]) == 0:
+                del self.predicates[p]
+        else:
+            o = unicode(o)
+            # target is a literal
+            if p not in self.nodes[s_nn]["literal_links"]:
+                return
+            if o not in self.nodes[s_nn]["literal_links"][p]:
+                return
+            self.nodes[s_nn]["literal_links"][p].remove(o)
+            if len(self.nodes[s_nn]["literal_links"][p]) == 0:
+                del self.nodes[s_nn]["literal_links"][p]
+            self.literals[o][p].remove(s_nn)
+            if len(self.literals[o][p]) == 0:
+                del self.literals[o][p]
+            if len(self.literals[o]) == 0:
+                del self.literals[o]
+            self.literal_predicates[p].remove((s_nn, o))
+            if len(self.literal_predicates[p]) == 0:
+                del self.literal_predicates[p]
         return
 
     def merge(self, from_id, to_id):
@@ -194,8 +286,29 @@ class TripleStore(object):
         to_nn = self.ids[to_id]
         if from_nn == to_nn:
             return
-        #Move each link, carefully. 
-        #Move each ID
+        #Rewrite each link
+        links = self.generate_triples_for_id(from_id)
+        #forward
+        for x in links[0]:
+            s, p, o = x
+            self.add_link((to_id, p, o))
+        #reverse
+        for x in links[1]:
+            s, p, o = x
+            self.add_link((s, p, to_id))
+        #literal
+        for x in links[2]:
+            s, p, o = x
+            self.add_link((to_id, p, o))
+        #Gather a copy of the IDs
+        ids = list(self.nodes[from_nn]["ids"])
+        #Delete the from node
+        self.delete_node(from_id, force=True)
+        #Add the IDs
+        for id in ids:
+            self.add_id_for_node(id, to_id)
+        return
+
 
 
     # Use external reconciliation based on a given property (eg, name, and using api/service/search)
@@ -585,13 +698,12 @@ class TripleStore(object):
 
 
     # Load a graph based on the results from json.load(file)
-    def __generate_json_id(self):
+    def __generate_id(self):
         self.__json_id += 1
         return str(self.__json_id)
 
     @print_timing
     def load_json(self, json):
-        self.__json_id = 0;
         if type(json) == type([]):
             for x in json:
                 self.__json_load_helper(x)
@@ -602,7 +714,7 @@ class TripleStore(object):
         if "id" in json:
             node = self.add_node(unicode(json["id"]))
         else:
-            node = self.add_node(self.__generate_json_id())
+            node = self.add_node(self.__generate_id())
 
         for k, v in json.iteritems():
             t = self.ns_split_id(k)
