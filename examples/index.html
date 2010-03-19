@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <title>jgd.js</title>
+</head>
+<body>
+    <div class='main'>
+        <div class='query' style='float:right'>
+            <h2>Query</h2>
+            <textarea id='query' rows="20" cols="60">
+[{
+    "id": null,
+    "knows": {
+        "name": "Sue"
+    }
+}]          </textarea>
+        </div>
+        
+        <div class='select_database'>
+            <h2>Database</h2>
+            <textarea id='input' rows="20" cols="60">
+[{
+	"id" : ":bob",
+	"name" : "Bob",
+	"knows" : [":mary", ":sue"]
+},
+{
+	"id" : ":mary",
+	"name" : "Mary",
+	"knows" : [":sue"]
+},
+{
+	"id" : ":sue",
+	"name" : "Sue",
+	"knows" : [":mary"]
+}]          </textarea>
+        </div>
+
+        <div class='msg'></div>
+        <div class='error' style='color: #d33; text-align: center;'></div>
+
+        
+        <pre id='response'>
+            
+        </pre>
+    </div>
+
+    <script src="../src/TripleStore.js" charset="utf-8"></script>
+    <script src="jquery.js" charset="utf-8"></script>
+    <script src="jquery.insertAtCaret.js" charset="utf-8"></script>
+    <script src='onEdit.js' charset="utf-8"></script>
+    <script>
+        var ts;
+        function inputChanged() {
+            clearError();
+            clearMsg();
+        }
+        function loadJSON() {
+            try {
+                var input = JSON.parse($("#input").val())
+            } catch (e) {
+                error("Error parsing input JSON: " + e);
+                return
+            }
+            ts = new TripleStore();
+            ts.load_json(input);
+            msg("Database ready.")
+        }
+        
+        function preQuery() {
+            clearResponse();
+            clearError();
+        }
+        function query() {
+            try {
+                var query = JSON.parse($("#query").val())
+            } catch (e) {
+                error("Error parsing query JSON: " + e);
+                return
+            }
+            try {
+                var r = ts.MQL(query);
+            } catch (e) {
+                error("Error in TripleStore: " + e);
+            }
+            
+            response(r);
+        }
+        function clearError() {
+            $(".error").empty();
+        }
+        function error(msg) {
+            $(".error").html(msg);
+        }
+        function clearMsg() {
+            $(".msg").empty();
+        }
+        function msg(msg) {
+            $(".msg").html(msg);
+        }
+        function clearResponse() { $("#response").empty()}
+        function response(r) {
+            $("#response").html(JSON.stringify(r,null,4));
+        }
+        
+        $(function() {
+            captureEdits($("#input"), loadJSON, inputChanged);
+            captureEdits($("#query"), query, preQuery);
+        })
+        
+    </script>
+</body>
+</html>
