@@ -51,19 +51,34 @@
     <script src='onEdit.js' charset="utf-8"></script>
     <script>
         var ts;
+        var parsingWorker;
         function inputChanged() {
             clearError();
             clearMsg();
+            clearResponse();
+            if (parsingWorker)
+                parsingWorker.cancel();
         }
         function loadJSON() {
+            ts = undefined;
+            msg("parsing...")
             try {
                 var input = JSON.parse($("#input").val())
             } catch (e) {
                 error("Error parsing input JSON: " + e);
                 return
             }
-            ts = new TripleStore(input);
-            msg("Database ready.")
+            msg("indexing...")
+            var new_ts = new TripleStore();
+            var parsingWork = new_ts.load_json(input);
+            parsingWork.addCallback(function() {
+                ts = new_ts;
+                msg("Database ready.");
+                query();
+            })
+            parsingWork.addListener("progress", function(pct) {
+                msg("indexing... " + Math.round(pct) + "%");
+            });
         }
         
         function preQuery() {
@@ -71,6 +86,7 @@
             clearError();
         }
         function query() {
+            if (!ts) return;
             try {
                 var query = JSON.parse($("#query").val())
             } catch (e) {
@@ -89,6 +105,7 @@
             $(".error").empty();
         }
         function error(msg) {
+            clearMsg();
             $(".error").html(msg);
         }
         function clearMsg() {

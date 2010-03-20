@@ -31,7 +31,8 @@ var t2 = [{
 
 TestCase("A few example queries",{
     "test loading a json file": function() {
-        var ts = new TripleStore(t1);
+        var ts = new TripleStore();
+        ts.load_json(t1);
     },
     "test loading both json files": function() {
         var ts = new TripleStore(t1);

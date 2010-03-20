@@ -21,6 +21,13 @@ var TripleStore = (function(toplevel) {
         return [val];
     }
 
+    function inArray(obj, array) {
+        for (var i = 0; i < array.length; i++)
+            if (obj === array[i])
+                return true
+        return false;
+    }
+
     function getKeys(obj) {
         var keys = [];
         for (var key in obj) keys.push(key);
@@ -54,10 +61,7 @@ var TripleStore = (function(toplevel) {
                     return container.contains(val);
                 return (val in container);
             case "array":
-                for (var i = 0; i < container.length; i++)
-                    if (val === container[i])
-                        return true
-                return false;
+                return inArray(val, container);
             default:
                 throw new Error("pyIn doesn't know how to detect containment in a " + getType(val) + " pyIn("+JSON.stringify(val)+", "+JSON.stringify(container)+")");
         }
@@ -97,6 +101,121 @@ var TripleStore = (function(toplevel) {
             this.addAll(arr);
     }
     
+    function time() {
+        return new Date().valueOf();
+    }
+    
+    /** @constructor */
+    function EventEmitter() {}
+
+    EventEmitter.prototype.listeners = function(name) {
+        this.handlers = this.handlers || {};
+        this.handlers[name] = this.handlers[name] || [];
+        return this.handlers[name];
+    }
+
+    /** @param {!string} name
+      * @param {!function()} handler
+      */
+    EventEmitter.prototype.addListener = function(name, handler) {
+        this.listeners(name).push(handler);
+    }
+
+    /** @param {!string} name
+      * @param {...} var_args
+      */
+    EventEmitter.prototype.emit = function(name, var_args) {
+        var args = Array.prototype.slice.call(arguments, 1);
+        $.each(this.listeners(name), function(_, handler) {
+            handler.apply(null, args);
+        });
+    }
+
+    /** @constructor */
+    function WorkingPromise() {
+        this.startTime = time();
+        this.isCancelled = false;
+        this.totalWork = 0;
+        this.progress = 0;
+    }
+    WorkingPromise.prototype = new EventEmitter();
+    
+    //10 and 10 works well for keeping a browser UI responsive
+    WorkingPromise.prototype.work_time = 10;
+    WorkingPromise.prototype.rest_time = 10;
+    
+    WorkingPromise.prototype.shouldYield = function(continueFunction, progress) {
+        if (this.isCancelled)
+            return true;
+        if (progress)
+            this.progress += progress;
+        if (time() <= this.startTime + this.work_time)
+            return false;
+
+        if (this.totalWork > 0)
+            this.emit("progress", 100 * (this.progress / this.totalWork));
+
+        this.startTime = time();
+        if (this.rest_time === 0)
+            //it's ok that this.nextAction never gets set, everything still works fine
+            this.nextAction = this.initialWork(continueFunction);
+        else
+            this.nextAction = setTimeout(continueFunction, this.rest_time);
+        return true;
+    }
+
+    WorkingPromise.prototype.cancel = function(){
+        if (this.nextAction)
+            clearTimeout(this.nextAction);
+        this.isCancelled = true;
+    }
+    
+    WorkingPromise.prototype.success = function() {
+        if (this.isCancelled) return false;
+        this.emit("success", arguments);
+    }
+
+    WorkingPromise.prototype.addCallback = function(callback) {
+        this.addListener("success", callback);
+    }
+
+    //much more efficient if it exists
+    try {
+        WorkingPromise.prototype.initialWork = process.nextTick;
+    } catch(_) {
+        WorkingPromise.prototype.initialWork = function(continueFunction) {
+            return setTimeout(continueFunction, 0);
+        }
+    }
+    
+    function workerForEach(array, f) {
+        var i = 0;
+        function each() {
+            while (i < array.length) {
+                f(array[i], i);
+                i++;
+                if (p.shouldYield(each, 1))
+                    return;
+            }
+            p.success();
+        }
+        var p = new WorkingPromise();
+        p.totalWork += array.length;
+        p.initialWork(each);
+        return p;
+    }
+    
+//     function PromiseGroup(promises) {
+//         if (promises)
+//             for (var i = 0; i < promises.length; i++)
+//                 this.addPromise(promises[i]);
+//         this.promisesWithSuccess = [];
+//     }
+//     PromiseGroup.prototype = new EventEmitter();
+//     function addPromise(promise) {
+//         
+//     }
+    
     /** @constructor 
       * @param {boolean=} universal
       */
@@ -121,8 +240,6 @@ var TripleStore = (function(toplevel) {
         this.ns = {};
         this.primitive_count = 0;
         this.__json_id = 0;
-        if (initial_contents)
-            this.load_json(initial_contents);
     }
     
     /** @typedef {{ids: Array.<number>, 
@@ -760,15 +877,17 @@ var TripleStore = (function(toplevel) {
         return this.__json_id + "";
     }
     
-    TripleStore.prototype.load_json = function(json) {
+    /** @param {Array.<Object>} json_array 
+      * @return !WorkingPromise
+      */
+    TripleStore.prototype.load_json = function(json_array) {
         var self = this;
-        if (isArray(json))
-            pyForEach(json, function(x) {
-                self.__json_load_helper(x);
-            })
-        else if (getType(json) === "object")
-            this.__json_load_helper(json);
+        return workerForEach(json_array, function(json) {
+            self.__json_load_helper(json);
+        });
     }
+    
+    /** @param {Object} json */
     TripleStore.prototype.__json_load_helper = function(json) {
         var node;
         var self = this;
