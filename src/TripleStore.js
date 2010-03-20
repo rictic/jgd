@@ -109,7 +109,7 @@ var TripleStore = (function(toplevel) {
     NullAdapter.prototype = new Adapter();
     
     /** @constructor */
-    function TripleStore() {
+    function TripleStore(initial_contents) {
         //all of the indices
         this.ids = {};
         this.ns_ids = {};
@@ -121,6 +121,8 @@ var TripleStore = (function(toplevel) {
         this.ns = {};
         this.primitive_count = 0;
         this.__json_id = 0;
+        if (initial_contents)
+            this.load_json(initial_contents);
     }
     
     /** @typedef {{ids: Array.<number>, 

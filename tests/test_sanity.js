@@ -31,27 +31,22 @@ var t2 = [{
 
 TestCase("A few example queries",{
     "test loading a json file": function() {
-        var ts = new TripleStore();
-        ts.load_json(t1);
+        var ts = new TripleStore(t1);
     },
     "test loading both json files": function() {
-        var ts = new TripleStore();
-        ts.load_json(t1);
+        var ts = new TripleStore(t1);
         ts.load_json(t2);
     },
     "test fetching ids": function() {
-        var ts = new TripleStore();
-        ts.load_json(t1);
+        var ts = new TripleStore(t1);
         assertEq([{id:":bob"},{id:":mary"},{id:":sue"}], ts.MQL([{id:null}]))
     },
     "test fetching names": function() {
-        var ts = new TripleStore();
-        ts.load_json(t1);
+        var ts = new TripleStore(t1);
         assertEq([{name:"Bob"},{name:"Mary"},{name:"Sue"}], ts.MQL([{name:null}]))
     },
     "test fetching sub-objects": function() {
-        var ts = new TripleStore();
-        ts.load_json(t1);
+        var ts = new TripleStore(t1);
         var expected = [{
             knows:[{id: ":mary"}, {id:":sue"}]
         },{
@@ -60,8 +55,7 @@ TestCase("A few example queries",{
         assertEq(expected, ts.MQL([{knows:[{id:null}]}]))
     },
     "test filling in names of sub-objects": function() {
-        var ts = new TripleStore();
-        ts.load_json(t1);
+        var ts = new TripleStore(t1);
         var expected = [{
             knows:[{id: ":mary", name: "Mary"}, {id:":sue", name: "Sue"}]
         },{
