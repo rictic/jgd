@@ -126,9 +126,9 @@ var TripleStore = (function(toplevel) {
       */
     EventEmitter.prototype.emit = function(name, var_args) {
         var args = Array.prototype.slice.call(arguments, 1);
-        $.each(this.listeners(name), function(_, handler) {
-            handler.apply(null, args);
-        });
+        var listeners = this.listeners(name);
+        for (var i = 0; i < listeners.length; i++)
+            listeners[i].apply(null, args);
     }
 
     /** @constructor */
@@ -160,7 +160,7 @@ var TripleStore = (function(toplevel) {
             //it's ok that this.nextAction never gets set, everything still works fine
             this.nextAction = this.initialWork(continueFunction);
         else
-            this.nextAction = setTimeout(continueFunction, this.rest_time);
+            this.nextAction = setTimeout(this.errorWrapper(continueFunction), this.rest_time);
         return true;
     }
 
@@ -178,13 +178,32 @@ var TripleStore = (function(toplevel) {
     WorkingPromise.prototype.addCallback = function(callback) {
         this.addListener("success", callback);
     }
-
+    
+    WorkingPromise.prototype.addErrback = function(errback) {
+        this.addListener("error", errback);
+    }
+    
+    WorkingPromise.prototype.errorWrapper = function(continueFunction) {
+        var self = this;
+        return function() {
+            try {
+                continueFunction.call(null, arguments);
+            }
+            catch(e) {
+                self.emit("error", e);
+            }
+        }
+    }
+    
     //much more efficient if it exists
     try {
-        WorkingPromise.prototype.initialWork = process.nextTick;
+        if (!process.nextTick) throw new Error();
+        WorkingPromise.prototype.initialWork = function(continueFunction) {
+            process.nextTick(this.errorWrapper(continueFunction));
+        }
     } catch(_) {
         WorkingPromise.prototype.initialWork = function(continueFunction) {
-            return setTimeout(continueFunction, 0);
+            return setTimeout(this.errorWrapper(continueFunction), 0);
         }
     }
     
@@ -882,7 +901,7 @@ var TripleStore = (function(toplevel) {
       */
     TripleStore.prototype.load_json = function(json_array) {
         var self = this;
-        return workerForEach(json_array, function(json) {
+        return workerForEach(json_array, function(json, i) {
             self.__json_load_helper(json);
         });
     }

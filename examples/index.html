@@ -79,6 +79,7 @@
             parsingWork.addListener("progress", function(pct) {
                 msg("indexing... " + Math.round(pct) + "%");
             });
+            parsingWork.addErrback(error)
         }
         
         function preQuery() {
@@ -106,7 +107,7 @@
         }
         function error(msg) {
             clearMsg();
-            $(".error").html(msg);
+            $(".error").html(msg + "");
         }
         function clearMsg() {
             $(".msg").empty();
