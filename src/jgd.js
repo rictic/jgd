@@ -32,13 +32,26 @@ function serve(file, host, port) {
     port = port || 8000;
     
     var ts = new TripleStore();
-    ts.load_json(JSON.parse(fs.readFileSync(file)));
-    var mqlServer = new MqlServer(ts);
-    mqlServer.start(host, port);
-    process.addListener("SIGINT", function() {
-        sys.puts("stopping server...");
-        mqlServer.stop();
+    sys.puts("reading file...");
+    var fbody = fs.readFileSync(file);
+    sys.puts("parsing JSON...");
+    var json = JSON.parse(fbody);
+    sys.puts("indexing...");
+    var load_worker = ts.load_json(json);
+    load_worker.addCallback(function() {
+        sys.print("\r100%\n");
+        var mqlServer = new MqlServer(ts);
+        mqlServer.start(host, port);
+        process.addListener("SIGINT", function() {
+            sys.puts("stopping server...");
+            mqlServer.stop();
+        });
     });
+    load_worker.work_time = 50;
+    load_worker.sleep_time = 0;
+    load_worker.addListener("progress", function(pct) {
+        sys.print("\r" + Math.round(pct) + "%");
+    })
 }
 
 
