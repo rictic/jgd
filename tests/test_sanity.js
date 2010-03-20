@@ -62,5 +62,10 @@ TestCase("A few example queries",{
             knows:[{id: ":sue", name: "Sue"}]
         },{knows: [{id:":mary", name: "Mary"}]}]
         assertEq(expected, ts.MQL([{knows:[{id:null, name:null}]}]))
+    },
+    "test querying a combined TripleStore": function() {
+        var ts = new TripleStore(t1);
+        ts.load_json(t2);
+        assertSubsetOf(ts.MQL([{name:null, knows:{id:":mary"}}]), [{name: "Bob"}, {name: "Sue"}, {name: "Fred"}])
     }
 });
