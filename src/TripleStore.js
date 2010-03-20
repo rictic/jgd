@@ -1,6 +1,6 @@
 //warning: completely and totally untested, translated by hand from Python
 
-(function(toplevel) {
+var TripleStore = (function(toplevel) {
     var debug;
     try {
         var sys = require('sys');
@@ -9,9 +9,7 @@
     if (debug === undefined && 'console' in toplevel && toplevel.console.log)
             debug = function(msg) {toplevel.console.log(msg);}
     if (debug === undefined) debug = function(){};
-    
-    var exports = 'exports' in toplevel ? toplevel.exports : toplevel;
-    
+
     //various needed convenience functions
     function isArray(obj) {
 		return Object.prototype.toString.call(obj) === "[object Array]";
@@ -825,5 +823,10 @@
         
         return node;
     }
-    exports.TripleStore = TripleStore;
+    
+    return TripleStore;
 })(this)
+
+try {
+    eval("exports.TripleStore = TripleStore;")
+}catch(e){}
