@@ -81,3 +81,8 @@ pg.promise.addCallback(function() {
 pg.promise.addErrback(function(e) {
     sys.debug("an error occurred:" + JSON.stringify(e));
 })
+
+setTimeout(function() {
+    sys.debug("Timeout reached");
+    process.exit(128);
+}, 5000);
