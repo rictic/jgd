@@ -1,4 +1,4 @@
-var TripleStore = require("./src/TripleStore").TripleStore;
+var TripleStore = require("../src/TripleStore").TripleStore;
 var promise = require("./promise");
 
 

@@ -1,7 +1,7 @@
 task :default => [:node_tests, :error_check, :run_tests]
 
 task :node_tests do
-  sh "node console_test_driver.js tests/meta.js tests/test_sanity.js"
+  sh "node tests/console_test_driver.js tests/meta.js tests/test_sanity.js"
 end
 
 task :error_check do
