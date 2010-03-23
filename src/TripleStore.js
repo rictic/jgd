@@ -130,6 +130,14 @@ var TripleStore = (function(toplevel) {
         for (var i = 0; i < listeners.length; i++)
             listeners[i].apply(null, args);
     }
+    
+    /** @constructor */
+    function Promise() {}
+    Promise.prototype = new EventEmitter();
+    Promise.prototype.addCallback = function(f) { this.addListener("success", f); }
+    Promise.prototype.addErrback = function(f) { this.addListener("error", f); }
+    Promise.prototype.emitSuccess = function() { this.emit.apply(this, ["success"].concat(Array.prototype.slice.call(arguments)))}
+    Promise.prototype.emitError = function() { this.emit.apply(this, ["error"].concat(Array.prototype.slice.call(arguments)))}
 
     /** @constructor */
     function WorkingPromise() {
@@ -138,7 +146,7 @@ var TripleStore = (function(toplevel) {
         this.totalWork = 0;
         this.progress = 0;
     }
-    WorkingPromise.prototype = new EventEmitter();
+    WorkingPromise.prototype = new Promise();
     
     //10 and 10 works well for keeping a browser UI responsive
     WorkingPromise.prototype.work_time = 10;
@@ -172,22 +180,14 @@ var TripleStore = (function(toplevel) {
     
     WorkingPromise.prototype.emitSuccess = function() {
         if (this.isCancelled) return false;
-        return this.emit("success", arguments);
+        this.emit.apply(this, ["success"].concat(Array.prototype.slice.call(arguments)))
     }
-    
+
     WorkingPromise.prototype.emitError = function() {
         if (this.isCancelled) return false;
-        return this.emit("success", arguments);
+        this.emit.apply(this, ["error"].concat(Array.prototype.slice.call(arguments)))
     }
-    
-    WorkingPromise.prototype.addCallback = function(callback) {
-        this.addListener("success", callback);
-    }
-    
-    WorkingPromise.prototype.addErrback = function(errback) {
-        this.addListener("error", errback);
-    }
-    
+
     WorkingPromise.prototype.errorWrapper = function(continueFunction) {
         var self = this;
         return function() {
@@ -228,17 +228,6 @@ var TripleStore = (function(toplevel) {
         p.initialWork(each);
         return p;
     }
-    
-//     function PromiseGroup(promises) {
-//         if (promises)
-//             for (var i = 0; i < promises.length; i++)
-//                 this.addPromise(promises[i]);
-//         this.promisesWithSuccess = [];
-//     }
-//     PromiseGroup.prototype = new EventEmitter();
-//     function addPromise(promise) {
-//         
-//     }
     
     /** @constructor 
       * @param {boolean=} universal
@@ -619,11 +608,20 @@ var TripleStore = (function(toplevel) {
         var filtered_out = this.__filter(q)
         var out_set = filtered_out[0]; var out_data = filtered_out[1]
         var results = this.__annotate(q, out_set, out_data);
-        if (is_list)
-            return results
-        if (results.length > 0)
-            return results[0]
-        return null;
+        
+        var p = new Promise();
+        
+        function getResults() {
+            if (is_list)
+                return results
+            if (results.length > 0)
+                return results[0]
+            return null;
+        }
+        setTimeout(function() {
+            p.emitSuccess(getResults());
+        }, 0);
+        return p;
     }
  
 //  For each key in the top level of the query, if the target is None, ignore it

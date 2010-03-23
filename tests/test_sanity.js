@@ -34,16 +34,18 @@ function test_query(db, query, test_fn) {
     var ts = new TripleStore();
     var p = new Promise();
     
+
     ts.load_json(db).addCallback(function() {
-        var result = ts.MQL(query);
-        try {
-            test_fn(result);
-        }
-        catch(e) {
-            p.emitError(e);
-            return;
-        }
-        p.emitSuccess();
+        ts.MQL(query).addCallback(function(result) {
+            try {
+                test_fn(result);
+            }
+            catch(e) {
+                p.emitError(e);
+                return;
+            }
+            p.emitSuccess();
+        });
     })
     return p;
 }
@@ -113,11 +115,14 @@ TestCase("A few example queries",{
         var p = new Promise();
         ts.load_json(t1).addCallback(function() {
             ts.load_json(t2).addCallback(function() {
-                try {
-                    assertSubsetOf(ts.MQL([{name:null, knows:{id:":mary"}}]), [{name: "Bob"}, {name: "Sue"}, {name: "Fred"}])                    
-                }
-                catch(e) {p.emitError(e);}
-                p.emitSuccess();
+                ts.MQL([{name:null, knows:{id:":mary"}}]).addCallback(function(result) {
+                    try {
+                        assertSubsetOf(result, [{name: "Bob"}, {name: "Sue"}, {name: "Fred"}])                    
+                    }
+                    catch(e) {p.emitError(e);}
+                    p.emitSuccess();
+                    
+                })
             })
         });
         return p;
