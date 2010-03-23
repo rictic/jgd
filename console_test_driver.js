@@ -6,7 +6,9 @@ var failures = [];
 var successes = [];
 var promises = [];
 function TestCase(suite_name, tests) {
-    for (var name in tests) {
+    for (var n in tests) {
+    (function(name) {
+            
         try {
             var result = tests[name]();
         }
@@ -32,6 +34,7 @@ function TestCase(suite_name, tests) {
 
         function add_failure(e) { failures.push(new Failure(suite_name, name, e)) }
         function add_success() { successes.push(new Success(suite_name, name)) }
+    })(n)
     }
 }
 
