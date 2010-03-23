@@ -2,8 +2,8 @@ function Promise() {}
 Promise.prototype = new process.EventEmitter();
 Promise.prototype.addCallback = function(f) { this.addListener("success", f); }
 Promise.prototype.addErrback = function(f) { this.addListener("error", f); }
-Promise.prototype.emitSuccess = function() { this.emit.apply(this, ["success"].concat(arguments))}
-Promise.prototype.emitError = function() { this.emit.apply(this, ["error"].concat(arguments))}
+Promise.prototype.emitSuccess = function() { this.emit.apply(this, ["success"].concat(Array.prototype.slice.call(arguments)))}
+Promise.prototype.emitError = function() { this.emit.apply(this, ["error"].concat(Array.prototype.slice.call(arguments)))}
 
 function PromiseGroup(promises) {
   var promise = new Promise();
