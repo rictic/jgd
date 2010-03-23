@@ -1,17 +1,37 @@
 var TripleStore = require("./src/TripleStore").TripleStore;
+var promise = require("./promise");
+
 
 var failures = [];
 var successes = [];
+var promises = [];
 function TestCase(suite_name, tests) {
     for (var name in tests) {
         try {
-            tests[name]();
+            var result = tests[name]();
         }
         catch (e) {
-            failures.push(new Failure(suite_name, name, e));
+            add_failure(e);
             continue;
         }
-        successes.push(new Success(suite_name, name));
+        if (result && result.addCallback) {
+            var p = new promise.Promise();
+            promises.push(p);
+            result.addCallback(function() {
+                add_success();
+                p.emitSuccess();
+            });
+            if (result.addErrback)
+                result.addErrback(function(e) {
+                    add_failure(e);
+                    p.emitSuccess();
+                });
+        }
+        else
+            add_success();
+
+        function add_failure(e) { failures.push(new Failure(suite_name, name, e)) }
+        function add_success() { successes.push(new Success(suite_name, name)) }
     }
 }
 
@@ -44,11 +64,17 @@ test_files.forEach(function(fn) {
 try {
     eval(test_text);
 } catch(e) {
-    failures.push(new Failure("toplevel eval error", fn, e));
+    failures.push(new Failure("toplevel eval error", "-", e));
 }
 
-sys.debug(successes.length + " successes, " + failures.length + " failures");
-failures.forEach(function(failure) {
-    sys.debug(failure);
-});
-process.exit(failures.length)
+var pg = new promise.PromiseGroup(promises);
+pg.promise.addCallback(function() {
+    sys.debug(successes.length + " successes, " + failures.length + " failures");
+    failures.forEach(function(failure) {
+        sys.debug(failure);
+    });
+    process.exit(failures.length)
+})
+pg.promise.addErrback(function(e) {
+    sys.debug("an error occurred:" + JSON.stringify(e));
+})

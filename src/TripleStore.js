@@ -170,11 +170,16 @@ var TripleStore = (function(toplevel) {
         this.isCancelled = true;
     }
     
-    WorkingPromise.prototype.success = function() {
+    WorkingPromise.prototype.emitSuccess = function() {
         if (this.isCancelled) return false;
-        this.emit("success", arguments);
+        return this.emit("success", arguments);
     }
-
+    
+    WorkingPromise.prototype.emitError = function() {
+        if (this.isCancelled) return false;
+        return this.emit("success", arguments);
+    }
+    
     WorkingPromise.prototype.addCallback = function(callback) {
         this.addListener("success", callback);
     }
@@ -216,7 +221,7 @@ var TripleStore = (function(toplevel) {
                 if (p.shouldYield(each, 1))
                     return;
             }
-            p.success();
+            p.emitSuccess();
         }
         var p = new WorkingPromise();
         p.totalWork += array.length;
