@@ -29,7 +29,30 @@ var t2 = [{
 	"id" : "bob",
 	"knows" : ":phil"
 }]
+var sys = require("sys")
+function test_query(db, query, test_fn) {
+    var ts = new TripleStore();
+    var p = new Promise();
+    
+    ts.load_json(db).addCallback(function() {
+        var result = ts.MQL(query);
+        try {
+            test_fn(result);
+        }
+        catch(e) {
+            p.emitError(e);
+            return;
+        }
+        p.emitSuccess();
+    })
+    return p;
+}
 
+function test_simple(expected, query) {
+    return test_query(t1, query, function(result) {
+        assertEq(expected, result);
+    })
+}
 
 TestCase("A few example queries",{
     "test loading a json file": function() {
@@ -47,48 +70,43 @@ TestCase("A few example queries",{
         return p;
     },
     "test fetching ids": function() {
-        var ts = new TripleStore();
-        var p = ts.load_json(t1);
-        p.addCallback(function() {
-            assertEq([{id:":bob"},{id:":mary"},{id:":sue"}], ts.MQL([{id:null}]))
-        })
-        return p;
+        var query = [{id:null}]
+        var expected = [{id:":bob"},{id:":mary"},{id:":sue"}]
+        
+        return test_simple(expected, query);
     },
     "test fetching names": function() {
-        var ts = new TripleStore();
-        var p = ts.load_json(t1);
-        p.addCallback(function() {
-            assertEq([{name:"Bob"},{name:"Mary"},{name:"Sue"}], ts.MQL([{name:null}]))
-        });
-        return p;
+        return test_query(t1, [{name:null}], function(result) {
+            assertEq([{name:"Bob"},{name:"Mary"},{name:"Sue"}], result);
+        })
     },
     "test fetching sub-objects": function() {
-        var ts = new TripleStore();
-        var p = ts.load_json(t1);
+        var query = [{knows:[{id:null}]}];
         var expected = [{
             knows:[{id: ":mary"}, {id:":sue"}]
-        },{
+        }
+        ,{
             knows:[{id: ":sue"}]
-        },{knows: [{id:":mary"}]}]
-
-        p.addCallback(function() {
-            assertEq(expected, ts.MQL([{knows:[{id:null}]}]))
-        });
-        return p;
+        }
+        ,{
+            knows:[{id:":mary"}]
+        }];
+        
+        return test_simple(expected, query);
     },
     "test filling in names of sub-objects": function() {
+        var query = [{knows:[{id:null, name:null}]}];
         var expected = [{
             knows:[{id: ":mary", name: "Mary"}, {id:":sue", name: "Sue"}]
-        },{
+        }
+        ,{
             knows:[{id: ":sue", name: "Sue"}]
-        },{knows: [{id:":mary", name: "Mary"}]}]
-
-        var ts = new TripleStore();
-        var p = ts.load_json(t1);
-        p.addCallback(function() {
-            assertEq(expected, ts.MQL([{knows:[{id:null, name:null}]}]))
-        });
-        return p;
+        }
+        ,{
+            knows:[{id:":mary", name: "Mary"}]
+        }];
+        
+        return test_simple(expected, query);
     },
     "test querying a combined TripleStore": function() {
         var ts = new TripleStore();
